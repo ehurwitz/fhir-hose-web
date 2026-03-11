@@ -1,0 +1,17 @@
+{
+  "name": "fhir-hose-web",
+  "version": "1.0.0",
+  "description": "Web app for aggregating health records from any patient portal into unified FHIR",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "multer": "^1.4.5-lts.1",
+    "cors": "^2.8.5",
+    "uuid": "^11.0.5"
+  }
+}
