@@ -5,9 +5,31 @@ import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { execFile } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const VALIDATE_SCRIPT = path.join(__dirname, 'validate_fhir.py');
+
+function validateBundle(bundle) {
+  return new Promise((resolve) => {
+    const child = execFile('python3.12', [VALIDATE_SCRIPT], { timeout: 30000 }, (err, stdout) => {
+      if (err) {
+        console.error('Validation script error:', err.message);
+        resolve(null);
+        return;
+      }
+      try {
+        resolve(JSON.parse(stdout));
+      } catch {
+        resolve(null);
+      }
+    });
+    child.stdin.write(JSON.stringify(bundle));
+    child.stdin.end();
+  });
+}
 
 const upload = multer({ dest: path.join(__dirname, '..', 'data', 'uploads') });
 const router = express.Router();
@@ -82,13 +104,17 @@ router.post('/', upload.single('file'), async (req, res) => {
 
     const fhirBundle = JSON.parse(fhirText.trim());
 
+    // Step 5: Validate against FHIR R4 spec
+    const validation = await validateBundle(fhirBundle);
+
     // Clean up uploaded file
     fs.unlinkSync(filePath);
 
     res.json({
       bundle: fhirBundle,
       resourceCount: fhirBundle.entry?.length || 0,
-      sourceFile: originalName
+      sourceFile: originalName,
+      validation,
     });
 
   } catch (err) {
@@ -136,10 +162,13 @@ router.post('/raw', async (req, res) => {
 
     const fhirBundle = JSON.parse(fhirText.trim());
 
+    const validation = await validateBundle(fhirBundle);
+
     res.json({
       bundle: fhirBundle,
       resourceCount: fhirBundle.entry?.length || 0,
-      sourceName: sourceName || 'unknown'
+      sourceName: sourceName || 'unknown',
+      validation,
     });
 
   } catch (err) {
@@ -149,3 +178,4 @@ router.post('/raw', async (req, res) => {
 });
 
 export default router;
+export { validateBundle };
